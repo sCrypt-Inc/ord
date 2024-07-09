@@ -229,6 +229,7 @@ impl Server {
         .route("/install.sh", get(Self::install_script))
         .route("/ordinal/:sat", get(Self::ordinal))
         .route("/output/:output", get(Self::output))
+        .route("/outpoint/:outpoint", get(Self::outpoint))
         .route("/outputs", post(Self::outputs))
         .route("/parents/:inscription_id", get(Self::parents))
         .route(
@@ -633,6 +634,32 @@ impl Server {
         .page(server_config)
         .into_response()
       })
+    })
+  }
+
+  async fn outpoint(
+    Extension(server_config): Extension<Arc<ServerConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    Path(outpoint): Path<OutPoint>,
+    AcceptJson(accept_json): AcceptJson,
+  ) -> ServerResult {
+    task::block_in_place(|| {
+
+      let mut response = Vec::new();
+      let inscriptions = index.get_inscriptions_for_output(outpoint)?;
+
+
+      for inscription in inscriptions {
+        let query = query::Inscription::Id(inscription);
+        let (info, _, _) = index
+          .inscription_info(query, None)?
+          .ok_or_not_found(|| format!("inscription {query}"))?;
+
+        response.push(info);
+      }
+
+
+      Ok(Json(response).into_response())
     })
   }
 
